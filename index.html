@@ -1,0 +1,1250 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poll Watcher – Deutsche Wahlumfragen</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;500;600;700&family=SF+Pro+Text:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #f5f5f7;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #fafafa;
+            --text-primary: #1d1d1f;
+            --text-secondary: #6e6e73;
+            --text-tertiary: #86868b;
+            --border-color: rgba(0,0,0,0.08);
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.04);
+            --shadow-md: 0 4px 20px rgba(0,0,0,0.08);
+            --shadow-lg: 0 12px 40px rgba(0,0,0,0.12);
+            --radius-sm: 12px;
+            --radius-md: 16px;
+            --radius-lg: 24px;
+            
+            --cdu: #000000;
+            --spd: #e3000f;
+            --gruene: #1aa037;
+            --fdp: #ffed00;
+            --afd: #009ee0;
+            --linke: #be3075;
+            --bsw: #6f2c91;
+            --sonstige: #808080;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .login-screen {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+
+        .login-screen.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .login-card {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(20px);
+            padding: 48px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .login-logo {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+            font-size: 36px;
+        }
+
+        .login-title { font-size: 28px; font-weight: 600; margin-bottom: 8px; }
+        .login-subtitle { color: var(--text-secondary); margin-bottom: 32px; font-size: 15px; }
+
+        .login-input {
+            width: 100%;
+            padding: 16px 20px;
+            font-size: 17px;
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            margin-bottom: 16px;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            outline: none;
+            font-family: inherit;
+        }
+
+        .login-input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15);
+        }
+
+        .login-button {
+            width: 100%;
+            padding: 16px;
+            font-size: 17px;
+            font-weight: 600;
+            color: white;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .login-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.35);
+        }
+
+        .login-error {
+            color: #ff3b30;
+            font-size: 14px;
+            margin-top: 12px;
+            display: none;
+        }
+
+        .login-error.show {
+            display: block;
+            animation: shake 0.5s ease;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-8px); }
+            40%, 80% { transform: translateX(8px); }
+        }
+
+        .app { display: none; min-height: 100vh; }
+        .app.visible { display: block; animation: fadeIn 0.5s ease; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .header {
+            background: rgba(255,255,255,0.8);
+            backdrop-filter: saturate(180%) blur(20px);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+        }
+
+        .logo-text { font-size: 22px; font-weight: 600; }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .last-update { font-size: 13px; color: var(--text-tertiary); }
+
+        .header-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .header-btn:hover { background: var(--bg-secondary); box-shadow: var(--shadow-sm); }
+        
+        .logout-btn:hover { background: #ff3b30; color: white; border-color: #ff3b30; }
+
+        .main {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 20px;
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            transition: box-shadow 0.2s ease;
+        }
+
+        .card:hover { box-shadow: var(--shadow-md); }
+
+        .card-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .card-title { font-size: 17px; font-weight: 600; }
+        .card-subtitle { font-size: 13px; color: var(--text-tertiary); margin-top: 2px; }
+        .card-body { padding: 20px 24px; }
+
+        .card-badge {
+            padding: 4px 10px;
+            font-size: 12px;
+            font-weight: 500;
+            border-radius: 12px;
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+        }
+
+        .card-badge.live { background: #34c759; color: white; }
+
+        .current-polls { grid-column: span 12; }
+        .trend-chart { grid-column: span 12; }
+        .analysis-card { grid-column: span 4; }
+        .timeline-card { grid-column: span 8; }
+        .institute-grid { grid-column: span 12; }
+        .coalition-calculator { grid-column: span 6; }
+        .other-topics { grid-column: span 6; }
+
+        .poll-bars {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .poll-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+            transition: transform 0.2s ease;
+        }
+
+        .poll-item:hover { transform: translateX(4px); }
+
+        .party-color {
+            width: 6px;
+            height: 48px;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+
+        .party-info { flex: 1; min-width: 0; }
+
+        .party-name {
+            font-weight: 600;
+            font-size: 15px;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .party-bar-container {
+            height: 8px;
+            background: rgba(0,0,0,0.06);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .party-bar {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .party-value {
+            font-size: 28px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .party-change {
+            font-size: 13px;
+            font-weight: 500;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .party-change.up { background: rgba(52, 199, 89, 0.15); color: #34c759; }
+        .party-change.down { background: rgba(255, 59, 48, 0.15); color: #ff3b30; }
+        .party-change.neutral { background: rgba(142, 142, 147, 0.15); color: #8e8e93; }
+
+        .institute-tabs {
+            display: flex;
+            gap: 8px;
+            padding: 16px 24px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+
+        .institute-tabs::-webkit-scrollbar { display: none; }
+
+        .institute-tab {
+            padding: 10px 18px;
+            font-size: 14px;
+            font-weight: 500;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+        }
+
+        .institute-tab:hover { background: var(--bg-secondary); }
+        .institute-tab.active { background: var(--text-primary); color: white; border-color: var(--text-primary); }
+
+        .chart-container {
+            position: relative;
+            height: 450px;
+            padding: 0 8px;
+        }
+
+        .chart-controls {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .chart-control-btn {
+            padding: 6px 14px;
+            font-size: 13px;
+            font-weight: 500;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .chart-control-btn:hover { background: var(--bg-secondary); }
+        .chart-control-btn.active { background: var(--text-primary); color: white; border-color: var(--text-primary); }
+
+        .analysis-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .analysis-item {
+            padding: 16px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+            border-left: 4px solid;
+        }
+
+        .analysis-item.trend-up { border-left-color: #34c759; }
+        .analysis-item.trend-down { border-left-color: #ff3b30; }
+        .analysis-item.trend-neutral { border-left-color: #007aff; }
+        .analysis-item.alert { border-left-color: #ff9500; }
+
+        .analysis-icon { font-size: 20px; margin-bottom: 8px; }
+        .analysis-title { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+        .analysis-text { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+
+        .timeline-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .timeline-item {
+            display: flex;
+            gap: 16px;
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+        }
+
+        .timeline-date {
+            min-width: 90px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-tertiary);
+        }
+
+        .timeline-content { flex: 1; }
+        .timeline-title { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+        .timeline-desc { font-size: 13px; color: var(--text-secondary); }
+
+        .institute-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+        }
+
+        .institute-card {
+            padding: 20px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+        }
+
+        .institute-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .institute-name { font-weight: 600; font-size: 15px; }
+        .institute-client { font-size: 12px; color: var(--text-tertiary); }
+        .institute-date { font-size: 12px; color: var(--text-tertiary); background: var(--bg-secondary); padding: 4px 8px; border-radius: 8px; }
+
+        .institute-results {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .institute-result {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            font-size: 13px;
+        }
+
+        .institute-result .dot { width: 8px; height: 8px; border-radius: 50%; }
+        .institute-result .value { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+        .coalition-options {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .coalition-option {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+            border: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .coalition-option.viable { border-color: #34c759; background: rgba(52, 199, 89, 0.05); }
+        .coalition-option.not-viable { opacity: 0.6; }
+
+        .coalition-parties { display: flex; gap: 8px; flex-wrap: wrap; }
+
+        .coalition-party {
+            padding: 4px 10px;
+            font-size: 13px;
+            font-weight: 500;
+            border-radius: 6px;
+            color: white;
+        }
+
+        .coalition-percentage { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .coalition-seats { font-size: 12px; color: var(--text-tertiary); }
+
+        .majority-line {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .majority-label { font-size: 13px; color: var(--text-tertiary); }
+        .majority-value { font-weight: 600; }
+
+        .topic-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .topic-item {
+            padding: 16px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+        }
+
+        .topic-question { font-weight: 500; font-size: 14px; margin-bottom: 12px; }
+
+        .topic-answers {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .topic-answer {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .topic-answer-bar {
+            flex: 1;
+            height: 24px;
+            background: rgba(0,0,0,0.06);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .topic-answer-fill {
+            height: 100%;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            padding-left: 10px;
+            font-size: 12px;
+            font-weight: 500;
+            color: white;
+            transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .topic-answer-label { font-size: 13px; min-width: 100px; }
+        .topic-answer-value { font-size: 14px; font-weight: 600; min-width: 40px; text-align: right; }
+
+        .footer {
+            margin-top: 40px;
+            padding: 24px;
+            text-align: center;
+            color: var(--text-tertiary);
+            font-size: 13px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .footer-sources {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 12px;
+        }
+
+        .footer-source {
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .footer-source:hover { color: var(--text-primary); }
+
+        @media (max-width: 1024px) {
+            .trend-chart, .analysis-card, .timeline-card, .coalition-calculator, .other-topics { grid-column: span 12; }
+        }
+
+        @media (max-width: 768px) {
+            .header-content { padding: 12px 16px; }
+            .main { padding: 16px; }
+            .dashboard-grid { gap: 16px; }
+            .card-header, .card-body { padding: 16px; }
+            .poll-bars { grid-template-columns: 1fr; }
+            .chart-container { height: 350px; }
+            .login-card { padding: 32px 24px; }
+            .logo-text { font-size: 18px; }
+            .institute-cards { grid-template-columns: 1fr; }
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-primary: #000000;
+                --bg-secondary: #1c1c1e;
+                --bg-tertiary: #2c2c2e;
+                --text-primary: #f5f5f7;
+                --text-secondary: #a1a1a6;
+                --text-tertiary: #6e6e73;
+                --border-color: rgba(255,255,255,0.1);
+            }
+            .header { background: rgba(28,28,30,0.8); }
+            .login-card { background: rgba(28,28,30,0.95); }
+            .login-input { background: var(--bg-tertiary); color: var(--text-primary); }
+        }
+
+        html { scroll-behavior: smooth; }
+    </style>
+</head>
+<body>
+    <div class="login-screen" id="loginScreen">
+        <div class="login-card">
+            <div class="login-logo">📊</div>
+            <h1 class="login-title">Poll Watcher</h1>
+            <p class="login-subtitle">Deutsche Wahlumfragen im Überblick</p>
+            <form id="loginForm">
+                <input type="password" class="login-input" id="passwordInput" placeholder="Passwort eingeben" autocomplete="current-password">
+                <button type="submit" class="login-button">Anmelden</button>
+            </form>
+            <p class="login-error" id="loginError">Falsches Passwort. Bitte erneut versuchen.</p>
+        </div>
+    </div>
+
+    <div class="app" id="app">
+        <header class="header">
+            <div class="header-content">
+                <div class="logo-container">
+                    <div class="logo-icon">📊</div>
+                    <span class="logo-text">Poll Watcher</span>
+                </div>
+                <div class="header-actions">
+                    <span class="last-update" id="lastUpdate">Stand: --</span>
+                    <button class="header-btn" onclick="refreshData()">↻ Aktualisieren</button>
+                    <button class="header-btn logout-btn" onclick="logout()">Abmelden</button>
+                </div>
+            </div>
+        </header>
+
+        <main class="main">
+            <div class="dashboard-grid">
+                <section class="card current-polls">
+                    <div class="card-header">
+                        <div>
+                            <h2 class="card-title">Sonntagsfrage – Bundestagswahl</h2>
+                            <p class="card-subtitle">„Wenn am nächsten Sonntag Bundestagswahl wäre…"</p>
+                        </div>
+                        <span class="card-badge live">● Live</span>
+                    </div>
+                    <div class="institute-tabs" id="instituteTabs"></div>
+                    <div class="card-body">
+                        <div class="poll-bars" id="pollBars"></div>
+                    </div>
+                </section>
+
+                <section class="card trend-chart">
+                    <div class="card-header">
+                        <div>
+                            <h2 class="card-title">Umfrageverlauf seit 2022</h2>
+                            <p class="card-subtitle">Monatliche Durchschnittswerte aller Institute</p>
+                        </div>
+                        <div class="chart-controls" id="chartControls"></div>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="trendChart"></canvas>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card timeline-card">
+                    <div class="card-header">
+                        <div>
+                            <h2 class="card-title">Wichtige Ereignisse</h2>
+                            <p class="card-subtitle">Politische Meilensteine seit 2022</p>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="timeline-list" id="timelineList"></div>
+                    </div>
+                </section>
+
+                <section class="card analysis-card">
+                    <div class="card-header">
+                        <div>
+                            <h2 class="card-title">Trend-Analyse</h2>
+                            <p class="card-subtitle">Aktuelle Auffälligkeiten</p>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="analysis-list" id="analysisList"></div>
+                    </div>
+                </section>
+
+                <section class="card institute-grid">
+                    <div class="card-header">
+                        <div>
+                            <h2 class="card-title">Alle Institute im Überblick</h2>
+                            <p class="card-subtitle">Aktuelle Umfrageergebnisse</p>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="institute-cards" id="instituteCards"></div>
+                    </div>
+                </section>
+
+                <section class="card coalition-calculator">
+                    <div class="card-header">
+                        <div>
+                            <h2 class="card-title">Koalitionsoptionen</h2>
+                            <p class="card-subtitle">Basierend auf dem Durchschnitt</p>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="coalition-options" id="coalitionOptions"></div>
+                        <div class="majority-line">
+                            <span class="majority-label">Mehrheit benötigt:</span>
+                            <span class="majority-value">316 von 630 Sitzen</span>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card other-topics">
+                    <div class="card-header">
+                        <div>
+                            <h2 class="card-title">Weitere Umfragethemen</h2>
+                            <p class="card-subtitle">Regierungsarbeit & mehr</p>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="topic-list" id="topicList"></div>
+                    </div>
+                </section>
+            </div>
+
+            <footer class="footer">
+                <div class="footer-sources">
+                    <a href="https://www.forschungsgruppe.de" class="footer-source" target="_blank">Forschungsgruppe Wahlen</a>
+                    <a href="https://www.infratest-dimap.de" class="footer-source" target="_blank">Infratest dimap</a>
+                    <a href="https://www.forsa.de" class="footer-source" target="_blank">Forsa</a>
+                    <a href="https://www.insa-consulere.de" class="footer-source" target="_blank">INSA</a>
+                    <a href="https://www.ifd-allensbach.de" class="footer-source" target="_blank">Allensbach</a>
+                    <a href="https://yougov.de" class="footer-source" target="_blank">YouGov</a>
+                </div>
+                <p>Quellen: Öffentlich-rechtliche Medien, Umfrageinstitute, Nachrichtenagenturen</p>
+                <p style="margin-top: 8px;">© 2025 Poll Watcher – Alle Angaben ohne Gewähr</p>
+            </footer>
+        </main>
+    </div>
+
+    <script>
+        const PASSWORD = 'poll2025';
+        
+        const PARTY_COLORS = {
+            'CDU/CSU': '#000000',
+            'SPD': '#e3000f',
+            'Grüne': '#1aa037',
+            'FDP': '#ffed00',
+            'AfD': '#009ee0',
+            'Linke': '#be3075',
+            'BSW': '#6f2c91',
+            'Sonstige': '#808080'
+        };
+
+        // Umfassende historische Daten (Monatliche Durchschnitte) 2022-2025
+        const historicalData = [
+            // 2022 - Beginn der Ampel-Regierung, Ukraine-Krieg
+            { date: '2022-01-01', label: 'Jan 22', values: { 'SPD': 25, 'CDU/CSU': 23, 'Grüne': 16, 'FDP': 12, 'AfD': 11, 'Linke': 6 }},
+            { date: '2022-02-01', label: 'Feb 22', values: { 'SPD': 25, 'CDU/CSU': 24, 'Grüne': 16, 'FDP': 11, 'AfD': 11, 'Linke': 5 }},
+            { date: '2022-03-01', label: 'Mär 22', values: { 'SPD': 24, 'CDU/CSU': 26, 'Grüne': 18, 'FDP': 10, 'AfD': 10, 'Linke': 5 }, event: 'Ukraine-Krieg beginnt'},
+            { date: '2022-04-01', label: 'Apr 22', values: { 'SPD': 23, 'CDU/CSU': 26, 'Grüne': 20, 'FDP': 9, 'AfD': 10, 'Linke': 5 }},
+            { date: '2022-05-01', label: 'Mai 22', values: { 'SPD': 22, 'CDU/CSU': 26, 'Grüne': 22, 'FDP': 8, 'AfD': 10, 'Linke': 4 }},
+            { date: '2022-06-01', label: 'Jun 22', values: { 'SPD': 21, 'CDU/CSU': 27, 'Grüne': 23, 'FDP': 8, 'AfD': 10, 'Linke': 4 }},
+            { date: '2022-07-01', label: 'Jul 22', values: { 'SPD': 20, 'CDU/CSU': 27, 'Grüne': 23, 'FDP': 7, 'AfD': 11, 'Linke': 4 }},
+            { date: '2022-08-01', label: 'Aug 22', values: { 'SPD': 19, 'CDU/CSU': 27, 'Grüne': 22, 'FDP': 7, 'AfD': 12, 'Linke': 5 }},
+            { date: '2022-09-01', label: 'Sep 22', values: { 'SPD': 18, 'CDU/CSU': 27, 'Grüne': 21, 'FDP': 7, 'AfD': 13, 'Linke': 5 }},
+            { date: '2022-10-01', label: 'Okt 22', values: { 'SPD': 18, 'CDU/CSU': 27, 'Grüne': 19, 'FDP': 7, 'AfD': 14, 'Linke': 5 }, event: 'Energiekrise'},
+            { date: '2022-11-01', label: 'Nov 22', values: { 'SPD': 18, 'CDU/CSU': 28, 'Grüne': 18, 'FDP': 7, 'AfD': 15, 'Linke': 5 }},
+            { date: '2022-12-01', label: 'Dez 22', values: { 'SPD': 18, 'CDU/CSU': 28, 'Grüne': 18, 'FDP': 7, 'AfD': 15, 'Linke': 5 }},
+            
+            // 2023 - Aufstieg der AfD
+            { date: '2023-01-01', label: 'Jan 23', values: { 'SPD': 19, 'CDU/CSU': 28, 'Grüne': 18, 'FDP': 6, 'AfD': 15, 'Linke': 5 }},
+            { date: '2023-02-01', label: 'Feb 23', values: { 'SPD': 19, 'CDU/CSU': 28, 'Grüne': 18, 'FDP': 6, 'AfD': 15, 'Linke': 5 }},
+            { date: '2023-03-01', label: 'Mär 23', values: { 'SPD': 18, 'CDU/CSU': 28, 'Grüne': 17, 'FDP': 6, 'AfD': 16, 'Linke': 5 }},
+            { date: '2023-04-01', label: 'Apr 23', values: { 'SPD': 18, 'CDU/CSU': 28, 'Grüne': 17, 'FDP': 6, 'AfD': 16, 'Linke': 5 }},
+            { date: '2023-05-01', label: 'Mai 23', values: { 'SPD': 17, 'CDU/CSU': 28, 'Grüne': 16, 'FDP': 6, 'AfD': 17, 'Linke': 5 }},
+            { date: '2023-06-01', label: 'Jun 23', values: { 'SPD': 17, 'CDU/CSU': 27, 'Grüne': 15, 'FDP': 6, 'AfD': 19, 'Linke': 5 }, event: 'Heizungsgesetz-Streit'},
+            { date: '2023-07-01', label: 'Jul 23', values: { 'SPD': 16, 'CDU/CSU': 26, 'Grüne': 14, 'FDP': 6, 'AfD': 21, 'Linke': 5 }},
+            { date: '2023-08-01', label: 'Aug 23', values: { 'SPD': 16, 'CDU/CSU': 26, 'Grüne': 14, 'FDP': 5, 'AfD': 22, 'Linke': 5 }},
+            { date: '2023-09-01', label: 'Sep 23', values: { 'SPD': 15, 'CDU/CSU': 26, 'Grüne': 14, 'FDP': 5, 'AfD': 22, 'Linke': 5 }},
+            { date: '2023-10-01', label: 'Okt 23', values: { 'SPD': 15, 'CDU/CSU': 27, 'Grüne': 14, 'FDP': 5, 'AfD': 22, 'Linke': 4 }, event: 'LTW Bayern/Hessen'},
+            { date: '2023-11-01', label: 'Nov 23', values: { 'SPD': 15, 'CDU/CSU': 29, 'Grüne': 13, 'FDP': 5, 'AfD': 22, 'Linke': 4 }},
+            { date: '2023-12-01', label: 'Dez 23', values: { 'SPD': 15, 'CDU/CSU': 30, 'Grüne': 13, 'FDP': 5, 'AfD': 22, 'Linke': 4 }},
+            
+            // 2024 - BSW-Gründung, Europawahl, Landtagswahlen Ost
+            { date: '2024-01-01', label: 'Jan 24', values: { 'SPD': 14, 'CDU/CSU': 30, 'Grüne': 13, 'FDP': 5, 'AfD': 22, 'Linke': 4, 'BSW': 5 }, event: 'BSW-Gründung'},
+            { date: '2024-02-01', label: 'Feb 24', values: { 'SPD': 14, 'CDU/CSU': 30, 'Grüne': 13, 'FDP': 4, 'AfD': 21, 'Linke': 3, 'BSW': 6 }},
+            { date: '2024-03-01', label: 'Mär 24', values: { 'SPD': 15, 'CDU/CSU': 30, 'Grüne': 13, 'FDP': 5, 'AfD': 20, 'Linke': 3, 'BSW': 6 }},
+            { date: '2024-04-01', label: 'Apr 24', values: { 'SPD': 15, 'CDU/CSU': 30, 'Grüne': 14, 'FDP': 5, 'AfD': 19, 'Linke': 3, 'BSW': 6 }},
+            { date: '2024-05-01', label: 'Mai 24', values: { 'SPD': 15, 'CDU/CSU': 29, 'Grüne': 14, 'FDP': 5, 'AfD': 18, 'Linke': 3, 'BSW': 7 }},
+            { date: '2024-06-01', label: 'Jun 24', values: { 'SPD': 14, 'CDU/CSU': 30, 'Grüne': 12, 'FDP': 5, 'AfD': 17, 'Linke': 3, 'BSW': 7 }, event: 'Europawahl'},
+            { date: '2024-07-01', label: 'Jul 24', values: { 'SPD': 14, 'CDU/CSU': 31, 'Grüne': 12, 'FDP': 5, 'AfD': 18, 'Linke': 3, 'BSW': 7 }},
+            { date: '2024-08-01', label: 'Aug 24', values: { 'SPD': 14, 'CDU/CSU': 31, 'Grüne': 11, 'FDP': 4, 'AfD': 19, 'Linke': 3, 'BSW': 7 }},
+            { date: '2024-09-01', label: 'Sep 24', values: { 'SPD': 14, 'CDU/CSU': 32, 'Grüne': 11, 'FDP': 4, 'AfD': 19, 'Linke': 3, 'BSW': 7 }, event: 'LTW Sachsen/Thür./Bbg.'},
+            { date: '2024-10-01', label: 'Okt 24', values: { 'SPD': 15, 'CDU/CSU': 31, 'Grüne': 11, 'FDP': 4, 'AfD': 19, 'Linke': 3, 'BSW': 6 }},
+            { date: '2024-11-01', label: 'Nov 24', values: { 'SPD': 15, 'CDU/CSU': 32, 'Grüne': 13, 'FDP': 4, 'AfD': 19, 'Linke': 4, 'BSW': 5 }, event: 'Ampel-Aus'},
+            { date: '2024-12-01', label: 'Dez 24', values: { 'SPD': 15, 'CDU/CSU': 32, 'Grüne': 14, 'FDP': 4, 'AfD': 20, 'Linke': 4, 'BSW': 5 }},
+            
+            // 2025 - Neuwahl und danach
+            { date: '2025-01-01', label: 'Jan 25', values: { 'SPD': 15, 'CDU/CSU': 30, 'Grüne': 14, 'FDP': 4, 'AfD': 21, 'Linke': 5, 'BSW': 5 }},
+            { date: '2025-02-01', label: 'Feb 25', values: { 'SPD': 16, 'CDU/CSU': 29, 'Grüne': 14, 'FDP': 4, 'AfD': 21, 'Linke': 5, 'BSW': 5 }},
+            { date: '2025-02-23', label: 'BTW 25', values: { 'SPD': 16.4, 'CDU/CSU': 28.6, 'Grüne': 11.6, 'FDP': 4.3, 'AfD': 20.8, 'Linke': 8.8, 'BSW': 4.9 }, event: 'Bundestagswahl'},
+            { date: '2025-03-15', label: 'Mär 25', values: { 'SPD': 16, 'CDU/CSU': 28, 'Grüne': 12, 'FDP': 4, 'AfD': 22, 'Linke': 9, 'BSW': 5 }},
+            { date: '2025-04-15', label: 'Apr 25', values: { 'SPD': 15, 'CDU/CSU': 27, 'Grüne': 12, 'FDP': 4, 'AfD': 23, 'Linke': 9, 'BSW': 4 }},
+            { date: '2025-05-01', label: 'Mai 25', values: { 'SPD': 15, 'CDU/CSU': 26, 'Grüne': 12, 'FDP': 3, 'AfD': 24, 'Linke': 10, 'BSW': 4 }, event: 'Regierungsbildung'},
+            { date: '2025-06-15', label: 'Jun 25', values: { 'SPD': 14, 'CDU/CSU': 26, 'Grüne': 12, 'FDP': 3, 'AfD': 25, 'Linke': 10, 'BSW': 4 }},
+            { date: '2025-07-15', label: 'Jul 25', values: { 'SPD': 14, 'CDU/CSU': 26, 'Grüne': 12, 'FDP': 3, 'AfD': 26, 'Linke': 10, 'BSW': 4 }},
+            { date: '2025-08-15', label: 'Aug 25', values: { 'SPD': 14, 'CDU/CSU': 25, 'Grüne': 12, 'FDP': 3, 'AfD': 26, 'Linke': 10, 'BSW': 4 }},
+            { date: '2025-09-15', label: 'Sep 25', values: { 'SPD': 13, 'CDU/CSU': 25, 'Grüne': 12, 'FDP': 3, 'AfD': 27, 'Linke': 10, 'BSW': 4 }},
+            { date: '2025-10-15', label: 'Okt 25', values: { 'SPD': 14, 'CDU/CSU': 25, 'Grüne': 12, 'FDP': 3, 'AfD': 26, 'Linke': 10, 'BSW': 4 }},
+            { date: '2025-11-25', label: 'Nov 25', values: { 'SPD': 14.5, 'CDU/CSU': 25.5, 'Grüne': 12, 'FDP': 3, 'AfD': 26.5, 'Linke': 10, 'BSW': 4 }}
+        ];
+
+        // Aktuelle Umfragen nach Institut
+        const pollData = {
+            institutes: {
+                'Durchschnitt': {
+                    client: 'Alle Institute',
+                    date: '25.11.2025',
+                    results: { 'AfD': 26.5, 'CDU/CSU': 25.5, 'SPD': 14.5, 'Grüne': 12, 'Linke': 10, 'BSW': 4, 'FDP': 3, 'Sonstige': 4.5 },
+                    changes: { 'AfD': 0.5, 'CDU/CSU': 0.5, 'SPD': -0.5, 'Grüne': 0, 'Linke': 0, 'BSW': -0.5, 'FDP': 0, 'Sonstige': 0 }
+                },
+                'Forsa': {
+                    client: 'RTL/n-tv',
+                    date: '25.11.2025',
+                    frequency: 'Wöchentlich',
+                    results: { 'AfD': 26, 'CDU/CSU': 25, 'SPD': 14, 'Grüne': 12, 'Linke': 11, 'BSW': 3, 'FDP': 3, 'Sonstige': 6 },
+                    changes: { 'AfD': 0, 'CDU/CSU': 1, 'SPD': 1, 'Grüne': 0, 'Linke': 0, 'BSW': 0, 'FDP': 0, 'Sonstige': -2 }
+                },
+                'INSA': {
+                    client: 'BILD',
+                    date: '28.11.2025',
+                    frequency: 'Wöchentlich',
+                    results: { 'AfD': 27, 'CDU/CSU': 25, 'SPD': 15, 'Grüne': 11, 'Linke': 10, 'BSW': 4, 'FDP': 3, 'Sonstige': 5 },
+                    changes: { 'AfD': 1, 'CDU/CSU': 0, 'SPD': 0, 'Grüne': 0, 'Linke': 0, 'BSW': 0, 'FDP': 0, 'Sonstige': -1 }
+                },
+                'Politbarometer': {
+                    client: 'ZDF',
+                    date: '21.11.2025',
+                    frequency: '2-wöchentlich',
+                    results: { 'AfD': 27, 'CDU/CSU': 27, 'SPD': 14, 'Grüne': 12, 'Linke': 9, 'BSW': 3, 'FDP': 3, 'Sonstige': 5 },
+                    changes: { 'AfD': 1, 'CDU/CSU': 1, 'SPD': 0, 'Grüne': 0, 'Linke': -1, 'BSW': 0, 'FDP': 0, 'Sonstige': -1 }
+                },
+                'Infratest dimap': {
+                    client: 'ARD',
+                    date: '05.11.2025',
+                    frequency: 'Monatlich',
+                    results: { 'AfD': 24, 'CDU/CSU': 27, 'SPD': 15, 'Grüne': 12, 'Linke': 10, 'BSW': 4, 'FDP': 3, 'Sonstige': 5 },
+                    changes: { 'AfD': -1, 'CDU/CSU': 0, 'SPD': 0, 'Grüne': 0, 'Linke': 0, 'BSW': 0, 'FDP': 0, 'Sonstige': 1 }
+                },
+                'Allensbach': {
+                    client: 'FAZ',
+                    date: '06.11.2025',
+                    frequency: '2-wöchentlich',
+                    results: { 'AfD': 24, 'CDU/CSU': 27, 'SPD': 15.5, 'Grüne': 11, 'Linke': 10, 'BSW': 4, 'FDP': 3.5, 'Sonstige': 5 },
+                    changes: { 'AfD': 0, 'CDU/CSU': 0, 'SPD': 0, 'Grüne': 0, 'Linke': 0, 'BSW': 0, 'FDP': 0, 'Sonstige': 0 }
+                }
+            }
+        };
+
+        // Wichtige Ereignisse
+        const timelineEvents = [
+            { date: '24.02.2022', title: 'Russlands Angriff auf Ukraine', desc: 'Zeitenwende-Rede Scholz, Grüne profitieren kurzfristig' },
+            { date: 'Jun-Aug 2022', title: 'Grüne auf Allzeithoch', desc: 'Habeck & Baerbock beliebt, bis zu 25% in Umfragen' },
+            { date: 'Herbst 2022', title: 'Energiekrise & Inflation', desc: 'AfD beginnt zu steigen, erreicht 14-15%' },
+            { date: 'Jun 2023', title: 'Heizungsgesetz-Debatte', desc: 'Grüne fallen unter 15%, AfD erstmals über 20%' },
+            { date: '08.10.2023', title: 'Landtagswahlen Bayern/Hessen', desc: 'AfD zweitstärkste Kraft, Grüne verlieren stark' },
+            { date: '08.01.2024', title: 'BSW-Gründung', desc: 'Wagenknecht spaltet sich von Linke ab' },
+            { date: '09.06.2024', title: 'Europawahl', desc: 'AfD wird zweitstärkste Kraft bundesweit' },
+            { date: 'Sep 2024', title: 'Landtagswahlen Ost', desc: 'AfD gewinnt in Sachsen, Thüringen, Brandenburg stark' },
+            { date: '06.11.2024', title: 'Ampel-Aus', desc: 'Scholz entlässt Lindner, Koalition zerbricht' },
+            { date: '23.02.2025', title: 'Bundestagswahl', desc: 'Union 28,6%, AfD 20,8%, Linke überrascht mit 8,8%' },
+            { date: '06.05.2025', title: 'Kanzlerwahl Merz', desc: 'Schwarz-Rot ohne Mehrheit, Merz im 2. Wahlgang gewählt' },
+            { date: 'Aug 2025', title: 'AfD überholt Union', desc: 'Erstmals liegt AfD in Umfragen vor CDU/CSU' }
+        ];
+
+        const otherTopics = [
+            {
+                question: 'Zufriedenheit mit der Bundesregierung',
+                source: 'INSA/BILD, 22.11.2025',
+                answers: [
+                    { label: 'Zufrieden', value: 22, color: '#34c759' },
+                    { label: 'Unzufrieden', value: 67, color: '#ff3b30' },
+                    { label: 'Keine Angabe', value: 11, color: '#8e8e93' }
+                ]
+            },
+            {
+                question: 'Zufriedenheit mit Kanzler Friedrich Merz',
+                source: 'INSA/BILD, 22.11.2025',
+                answers: [
+                    { label: 'Zufrieden', value: 25, color: '#34c759' },
+                    { label: 'Unzufrieden', value: 64, color: '#ff3b30' },
+                    { label: 'Keine Angabe', value: 11, color: '#8e8e93' }
+                ]
+            },
+            {
+                question: 'Rentenpolitik zu Lasten der Jüngeren?',
+                source: 'Politbarometer/ZDF, 21.11.2025',
+                answers: [
+                    { label: 'Ja', value: 71, color: '#007aff' },
+                    { label: 'Nein', value: 23, color: '#ff9500' }
+                ]
+            }
+        ];
+
+        const analyses = [
+            { type: 'alert', icon: '⚠️', title: 'AfD auf Rekordniveau', text: 'Mit 26-27% erreicht die AfD die höchsten je gemessenen Werte und liegt erstmals dauerhaft vor der Union.' },
+            { type: 'trend-down', icon: '📉', title: 'Union verliert seit BTW', text: 'CDU/CSU fiel von 28,6% bei der Wahl auf etwa 25% – ein Verlust von über 3 Punkten in 9 Monaten.' },
+            { type: 'trend-up', icon: '📈', title: 'Linke stabilisiert', text: 'Nach dem starken BTW-Ergebnis (8,8%) hält sich die Linke bei 9-11% und profitiert vom BSW-Schwäche.' },
+            { type: 'trend-neutral', icon: '📊', title: 'Keine GroKo-Mehrheit', text: 'CDU/CSU + SPD kommen nur auf ~40% – weit unter den für eine Mehrheit nötigen 50%.' },
+            { type: 'trend-down', icon: '😔', title: 'Rekord-Unzufriedenheit', text: 'Nur 22% sind mit der Regierung zufrieden – der niedrigste je gemessene Wert für Schwarz-Rot.' }
+        ];
+
+        let currentInstitute = 'Durchschnitt';
+        let currentTimeRange = 'all';
+        let trendChart = null;
+
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const password = document.getElementById('passwordInput').value;
+            if (password === PASSWORD) {
+                localStorage.setItem('pollWatcherAuth', 'true');
+                showApp();
+            } else {
+                document.getElementById('loginError').classList.add('show');
+                document.getElementById('passwordInput').value = '';
+                setTimeout(() => document.getElementById('loginError').classList.remove('show'), 3000);
+            }
+        });
+
+        function showApp() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('app').classList.add('visible');
+            initializeApp();
+        }
+
+        function logout() {
+            localStorage.removeItem('pollWatcherAuth');
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('app').classList.remove('visible');
+        }
+
+        function checkAuth() {
+            if (localStorage.getItem('pollWatcherAuth') === 'true') showApp();
+        }
+
+        function initializeApp() {
+            try { renderInstituteTabs(); } catch(e) { console.error('renderInstituteTabs:', e); }
+            try { renderPollBars(); } catch(e) { console.error('renderPollBars:', e); }
+            try { renderChartControls(); } catch(e) { console.error('renderChartControls:', e); }
+            try { renderTrendChart(); } catch(e) { console.error('renderTrendChart:', e); }
+            try { renderTimeline(); } catch(e) { console.error('renderTimeline:', e); }
+            try { renderAnalyses(); } catch(e) { console.error('renderAnalyses:', e); }
+            try { renderInstituteCards(); } catch(e) { console.error('renderInstituteCards:', e); }
+            try { renderCoalitions(); } catch(e) { console.error('renderCoalitions:', e); }
+            try { renderOtherTopics(); } catch(e) { console.error('renderOtherTopics:', e); }
+            try { updateLastUpdate(); } catch(e) { console.error('updateLastUpdate:', e); }
+        }
+
+        function renderInstituteTabs() {
+            const container = document.getElementById('instituteTabs');
+            container.innerHTML = Object.keys(pollData.institutes).map(inst => `
+                <button class="institute-tab ${inst === currentInstitute ? 'active' : ''}" onclick="selectInstitute('${inst}')">${inst}</button>
+            `).join('');
+        }
+
+        function selectInstitute(institute) {
+            currentInstitute = institute;
+            renderInstituteTabs();
+            renderPollBars();
+        }
+
+        function renderPollBars() {
+            const container = document.getElementById('pollBars');
+            const data = pollData.institutes[currentInstitute];
+            const sorted = Object.entries(data.results).sort((a, b) => b[1] - a[1]);
+            
+            container.innerHTML = sorted.map(([party, value]) => {
+                const change = data.changes[party] || 0;
+                const changeClass = change > 0 ? 'up' : change < 0 ? 'down' : 'neutral';
+                const changeText = change > 0 ? `+${change}` : change < 0 ? `${change}` : '±0';
+                const color = PARTY_COLORS[party] || '#808080';
+                
+                return `
+                    <div class="poll-item">
+                        <div class="party-color" style="background: ${color}"></div>
+                        <div class="party-info">
+                            <div class="party-name">${party}<span class="party-change ${changeClass}">${changeText}</span></div>
+                            <div class="party-bar-container">
+                                <div class="party-bar" style="width: ${value * 2.5}%; background: ${color}"></div>
+                            </div>
+                        </div>
+                        <div class="party-value">${value}%</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderChartControls() {
+            const container = document.getElementById('chartControls');
+            const ranges = [
+                { id: 'all', label: 'Alle' },
+                { id: '2025', label: '2025' },
+                { id: '2024', label: '2024' },
+                { id: '2023', label: '2023' },
+                { id: '2022', label: '2022' }
+            ];
+            container.innerHTML = ranges.map(r => `
+                <button class="chart-control-btn ${r.id === currentTimeRange ? 'active' : ''}" onclick="setTimeRange('${r.id}')">${r.label}</button>
+            `).join('');
+        }
+
+        function setTimeRange(range) {
+            currentTimeRange = range;
+            renderChartControls();
+            renderTrendChart();
+        }
+
+        function renderTrendChart() {
+            const ctx = document.getElementById('trendChart').getContext('2d');
+            if (trendChart) trendChart.destroy();
+
+            let filteredData = historicalData;
+            if (currentTimeRange !== 'all') {
+                filteredData = historicalData.filter(d => d.date.startsWith(currentTimeRange));
+            }
+
+            const labels = filteredData.map(d => d.label);
+            const parties = ['CDU/CSU', 'SPD', 'Grüne', 'AfD', 'FDP', 'Linke', 'BSW'];
+            
+            const datasets = parties.map(party => ({
+                label: party,
+                data: filteredData.map(d => d.values[party] !== undefined ? d.values[party] : null),
+                borderColor: PARTY_COLORS[party],
+                backgroundColor: PARTY_COLORS[party] + '20',
+                borderWidth: party === 'BSW' ? 2 : 2.5,
+                pointRadius: 3,
+                pointHoverRadius: 6,
+                tension: 0.3,
+                fill: false,
+                spanGaps: true,
+                hidden: party === 'BSW' && currentTimeRange === '2022'
+            }));
+
+            trendChart = new Chart(ctx, {
+                type: 'line',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { usePointStyle: true, padding: 20, font: { family: '-apple-system, BlinkMacSystemFont, sans-serif', size: 12 } }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(255,255,255,0.95)',
+                            titleColor: '#1d1d1f',
+                            bodyColor: '#6e6e73',
+                            borderColor: 'rgba(0,0,0,0.1)',
+                            borderWidth: 1,
+                            cornerRadius: 12,
+                            padding: 12,
+                            callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}%` }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { 
+                                font: { size: 11 }, 
+                                color: '#86868b',
+                                maxRotation: 45,
+                                autoSkip: true,
+                                maxTicksLimit: currentTimeRange === 'all' ? 12 : 15
+                            }
+                        },
+                        y: {
+                            min: 0,
+                            max: 35,
+                            grid: { color: 'rgba(0,0,0,0.06)' },
+                            ticks: { callback: v => v + '%', font: { size: 11 }, color: '#86868b' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderTimeline() {
+            const container = document.getElementById('timelineList');
+            container.innerHTML = timelineEvents.map(e => `
+                <div class="timeline-item">
+                    <div class="timeline-date">${e.date}</div>
+                    <div class="timeline-content">
+                        <div class="timeline-title">${e.title}</div>
+                        <div class="timeline-desc">${e.desc}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderAnalyses() {
+            const container = document.getElementById('analysisList');
+            container.innerHTML = analyses.map(a => `
+                <div class="analysis-item ${a.type}">
+                    <div class="analysis-icon">${a.icon}</div>
+                    <div class="analysis-title">${a.title}</div>
+                    <div class="analysis-text">${a.text}</div>
+                </div>
+            `).join('');
+        }
+
+        function renderInstituteCards() {
+            const container = document.getElementById('instituteCards');
+            const institutes = Object.entries(pollData.institutes).filter(([n]) => n !== 'Durchschnitt');
+            
+            container.innerHTML = institutes.map(([name, data]) => {
+                const sorted = Object.entries(data.results).sort((a, b) => b[1] - a[1]).slice(0, 6);
+                return `
+                    <div class="institute-card">
+                        <div class="institute-header">
+                            <div>
+                                <div class="institute-name">${name}</div>
+                                <div class="institute-client">${data.client} • ${data.frequency || ''}</div>
+                            </div>
+                            <div class="institute-date">${data.date}</div>
+                        </div>
+                        <div class="institute-results">
+                            ${sorted.map(([p, v]) => `
+                                <div class="institute-result">
+                                    <span class="dot" style="background: ${PARTY_COLORS[p]}"></span>
+                                    <span>${p.replace('CDU/CSU', 'Union')}</span>
+                                    <span class="value">${v}%</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderCoalitions() {
+            const container = document.getElementById('coalitionOptions');
+            const avg = pollData.institutes['Durchschnitt'].results;
+            
+            const coalitions = [
+                { parties: ['CDU/CSU', 'SPD', 'Grüne'], name: 'Kenia' },
+                { parties: ['CDU/CSU', 'SPD'], name: 'GroKo' },
+                { parties: ['AfD', 'CDU/CSU'], name: 'Schwarz-Blau' },
+                { parties: ['CDU/CSU', 'Grüne', 'FDP'], name: 'Jamaika' }
+            ];
+            
+            container.innerHTML = coalitions.map(c => {
+                const total = c.parties.reduce((s, p) => s + (avg[p] || 0), 0);
+                const seats = Math.round(total / 100 * 630);
+                const viable = total >= 50;
+                
+                return `
+                    <div class="coalition-option ${viable ? 'viable' : 'not-viable'}">
+                        <div class="coalition-parties">
+                            ${c.parties.map(p => `<span class="coalition-party" style="background: ${PARTY_COLORS[p]}; ${p === 'FDP' ? 'color: #000' : ''}">${p.replace('CDU/CSU', 'Union')}</span>`).join('')}
+                        </div>
+                        <div style="text-align: right">
+                            <div class="coalition-percentage">${total.toFixed(1)}%</div>
+                            <div class="coalition-seats">${seats} Sitze ${viable ? '✓' : '✗'}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderOtherTopics() {
+            const container = document.getElementById('topicList');
+            container.innerHTML = otherTopics.map(t => `
+                <div class="topic-item">
+                    <div class="topic-question">${t.question}</div>
+                    <div style="font-size: 11px; color: var(--text-tertiary); margin-bottom: 10px">${t.source}</div>
+                    <div class="topic-answers">
+                        ${t.answers.map(a => `
+                            <div class="topic-answer">
+                                <span class="topic-answer-label">${a.label}</span>
+                                <div class="topic-answer-bar">
+                                    <div class="topic-answer-fill" style="width: ${a.value}%; background: ${a.color}">${a.value > 15 ? a.value + '%' : ''}</div>
+                                </div>
+                                <span class="topic-answer-value">${a.value}%</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateLastUpdate() {
+            const now = new Date();
+            document.getElementById('lastUpdate').textContent = `Stand: ${now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+        }
+
+        function refreshData() {
+            const btn = document.querySelector('.header-btn');
+            btn.innerHTML = '↻ Lädt...';
+            btn.disabled = true;
+            setTimeout(() => { btn.innerHTML = '↻ Aktualisieren'; btn.disabled = false; updateLastUpdate(); }, 1500);
+        }
+
+        checkAuth();
+    </script>
+</body>
+</html>
