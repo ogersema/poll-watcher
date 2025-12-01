@@ -1,0 +1,40 @@
+name: Check for new polls
+
+on:
+  # Alle 2 Stunden automatisch ausführen
+  schedule:
+    - cron: '0 */2 * * *'
+  
+  # Manuell ausführbar über GitHub UI
+  workflow_dispatch:
+
+jobs:
+  check-polls:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Install dependencies
+        run: |
+          pip install requests
+          
+      - name: Check for new polls
+        env:
+          BUTTONDOWN_API_KEY: ${{ secrets.BUTTONDOWN_API_KEY }}
+        run: |
+          python scripts/check_polls.py
+          
+      - name: Commit updated state
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add data/last-check.json
+          git diff --staged --quiet || git commit -m "Update poll data [skip ci]"
+          git push
