@@ -1150,22 +1150,31 @@
             const text = document.getElementById('apiStatus');
             const badge = document.getElementById('dataBadge');
 
+            // Nur aktualisieren wenn Elemente existieren
             if (status === 'live') {
-                dot.className = 'api-dot live';
-                text.textContent = 'dawum.de Live';
-                badge.textContent = '● Live';
-                badge.className = 'card-badge live';
+                if (dot) dot.className = 'api-dot live';
+                if (text) text.textContent = 'dawum.de Live';
+                if (badge) {
+                    badge.textContent = '● Live';
+                    badge.className = 'card-badge live';
+                }
             } else if (status === 'loading') {
-                dot.className = 'api-dot';
-                dot.style.background = '#ff9500';
-                text.textContent = 'Lade...';
-                badge.textContent = '● Lädt...';
-                badge.className = 'card-badge loading';
+                if (dot) {
+                    dot.className = 'api-dot';
+                    dot.style.background = '#ff9500';
+                }
+                if (text) text.textContent = 'Lade...';
+                if (badge) {
+                    badge.textContent = '● Lädt...';
+                    badge.className = 'card-badge loading';
+                }
             } else {
-                dot.className = 'api-dot offline';
-                text.textContent = 'Offline-Modus';
-                badge.textContent = '● Offline';
-                badge.className = 'card-badge';
+                if (dot) dot.className = 'api-dot offline';
+                if (text) text.textContent = 'Offline-Modus';
+                if (badge) {
+                    badge.textContent = '● Offline';
+                    badge.className = 'card-badge';
+                }
             }
         }
 
@@ -1189,15 +1198,15 @@
         function renderLatestSurveys() {
             const container = document.getElementById('surveyList');
             
-            if (latestSurveys.length === 0) {
+            if (!latestSurveys || latestSurveys.length === 0) {
                 container.innerHTML = '<div class="loading-spinner"><div class="spinner"></div> Lade neueste Umfragen...</div>';
                 return;
             }
             
             container.innerHTML = latestSurveys.map(survey => {
                 const topParties = Object.entries(survey.results)
-                    .map(([id, value]) => ({ name: PARTY_MAPPING[id] || 'Unbekannt', value }))
-                    .filter(p => p.name !== 'Unbekannt')
+                    .map(([id, value]) => ({ name: PARTY_MAPPING[parseInt(id)] || PARTY_MAPPING[id] || 'Sonstige', value }))
+                    .filter(p => p.name !== 'Sonstige')
                     .sort((a, b) => b.value - a.value)
                     .slice(0, 3)
                     .map(p => `${p.name} ${p.value}%`)
@@ -1287,11 +1296,14 @@
                 if (!survey.Results) return '';
                 
                 const sorted = Object.entries(survey.Results)
-                    .map(([id, value]) => ({ 
-                        name: PARTY_MAPPING[id] || 'Sonstige', 
-                        value,
-                        color: PARTY_COLORS[PARTY_MAPPING[id]] || '#808080'
-                    }))
+                    .map(([id, value]) => {
+                        const partyName = PARTY_MAPPING[parseInt(id)] || PARTY_MAPPING[id] || 'Sonstige';
+                        return { 
+                            name: partyName, 
+                            value,
+                            color: PARTY_COLORS[partyName] || '#808080'
+                        };
+                    })
                     .sort((a, b) => b.value - a.value)
                     .slice(0, 6);
                 
